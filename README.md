@@ -111,14 +111,12 @@ O arquivo real, os keystores e todos os artefatos assinados estão ignorados pel
 .\gradlew.bat assembleRelease bundleRelease
 ```
 
-Para a Play Store, use o AAB e mantenha a chave de assinatura em armazenamento privado. Consulte [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
 ## Privacidade e segurança
 
 - A permissão `CAMERA` é solicitada somente para leitura pela câmera.
 - Imagens são selecionadas pelo Photo Picker, sem acesso amplo aos arquivos.
 - O histórico fica no banco privado do aplicativo até ser apagado pelo usuário.
-- A permissão `INTERNET` é removida explicitamente do manifesto final.
 - URLs suspeitas ou esquemas desconhecidos nunca são executados automaticamente.
 
 Leia a [política de privacidade](PRIVACY.md) e a [política de segurança](SECURITY.md).
