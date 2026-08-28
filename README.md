@@ -134,4 +134,3 @@ O código deste repositório é distribuído sob a [licença MIT](LICENSE).
 Criado por **Richard Ittou**.
 
 - [Instagram](https://www.instagram.com/richard.ittou/)
-- [GitHub](https://github.com/RichardXLR)
