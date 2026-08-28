@@ -1,0 +1,31 @@
+*.iml
+.gradle/
+.kotlin/
+.idea/
+local.properties
+keystore.properties
+**/build/
+captures/
+artifacts/
+dist/
+.externalNativeBuild/
+.cxx/
+
+# Pacotes e perfis gerados
+*.apk
+*.aab
+*.apks
+
+# Assinatura e credenciais locais
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db

@@ -1,0 +1,33 @@
+name: Sugerir uma melhoria
+description: Proponha uma funcionalidade ou melhoria de experiência.
+title: "[Melhoria]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Necessidade
+      description: Qual problema ou dificuldade esta proposta resolve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposta
+      description: Descreva a experiência desejada.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Opcional.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Princípios
+      options:
+        - label: A proposta pode funcionar sem conta, backend ou analytics.
+          required: true
+        - label: Procurei por propostas semelhantes.
+          required: true

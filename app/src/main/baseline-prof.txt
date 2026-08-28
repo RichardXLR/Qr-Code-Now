@@ -1,0 +1,8 @@
+Lcom/richardittou/qrcodenow/MainActivity;
+Lcom/richardittou/qrcodenow/QrCodeNowAppKt;
+Lcom/richardittou/qrcodenow/presentation/scanner/ScannerScreenKt;
+Lcom/richardittou/qrcodenow/presentation/scanner/ScannerViewModel;
+Lcom/richardittou/qrcodenow/presentation/generator/GeneratorScreenKt;
+Lcom/richardittou/qrcodenow/presentation/generator/GeneratorViewModel;
+Lcom/richardittou/qrcodenow/presentation/history/HistoryScreenKt;
+Lcom/richardittou/qrcodenow/presentation/history/HistoryViewModel;

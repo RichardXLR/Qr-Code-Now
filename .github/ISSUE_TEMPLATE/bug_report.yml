@@ -1,0 +1,66 @@
+name: Relatar um problema
+description: Informe uma falha reproduzível no QR Code Now.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Obrigado por ajudar a melhorar o QR Code Now. Não inclua QR Codes, links ou dados pessoais sensíveis.
+  - type: input
+    id: version
+    attributes:
+      label: Versão do aplicativo
+      placeholder: "1.0.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: android
+    attributes:
+      label: Versão do Android
+      options:
+        - Android 13
+        - Android 14
+        - Android 15
+        - Android 16
+        - Android 17
+        - Outra
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Aparelho
+      placeholder: Fabricante e modelo
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: O que aconteceu?
+      description: Explique o comportamento observado e o resultado esperado.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Abra...
+        2. Toque em...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências adicionais
+      description: Capturas ou logs sem informações pessoais. Este campo é opcional.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmações
+      options:
+        - label: Procurei por issues semelhantes.
+          required: true
+        - label: Removi informações pessoais e conteúdo sensível.
+          required: true
