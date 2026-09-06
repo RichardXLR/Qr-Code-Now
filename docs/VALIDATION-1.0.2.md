@@ -4,6 +4,17 @@
 
 Leitura intermitente pela câmera e por imagens, inclusive de QR Codes gerados no próprio aplicativo. O scanner continua offline e limitado a QR Codes.
 
+## Resultado em 5 de setembro de 2026
+
+- **25 testes unitários aprovados.**
+- **4 testes instrumentados aprovados** no emulador Android 17/API 37: `OK (4 tests)`, execução final de 12,255 segundos.
+- [Android CI aprovado](https://github.com/RichardXLR/Qr-Code-Now/actions/runs/34003359006): testes unitários, lint, APK debug, compilação dos testes Android e módulo benchmark.
+- APK release 1.0.2 / versionCode 3 compilado com R8 e redução de recursos; assinatura e alinhamento de páginas de 16 KB verificados.
+- Atualização do APK instalado aceita pelo Android, preservando a assinatura anterior. Abertura, navegação, geração validada e salvamento de PNG verificados no release.
+- Manifesto final sem `INTERNET`. Lint sem erros; avisos não bloqueantes de versões novas e sugestões de extensões Kotlin, sem atualização de dependências neste patch.
+
+A execução inicial foi prejudicada por ANRs do sistema do emulador. Depois da inicialização e da instalação do APK de teste recompilado, a suíte Android completa passou. A matriz física Android 13–17 e testes ópticos em celulares não foram executados nesta revisão.
+
 ## Regressões automatizadas
 
 - 25 testes unitários aprovados: parsers, geração/retorno, Unicode, limites de conteúdo, histórico, recuperação do scanner e descarte de resultados atrasados.

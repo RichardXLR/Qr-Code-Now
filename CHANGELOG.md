@@ -31,4 +31,5 @@
 - Botão da lanterna reposicionado acima da orientação do scanner, sem sobreposição.
 - APK release assinado para instalação direta em aparelhos Android 13+.
 
+[1.0.2]: https://github.com/RichardXLR/Qr-Code-Now/releases/tag/v1.0.2
 [1.0.1]: https://github.com/RichardXLR/Qr-Code-Now/releases/tag/v1.0.1
