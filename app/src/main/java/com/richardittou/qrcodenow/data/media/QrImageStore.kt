@@ -1,6 +1,7 @@
 package com.richardittou.qrcodenow.data.media
 
 import android.content.ContentValues
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -36,6 +37,7 @@ class QrImageStore @Inject constructor() {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(context.contentResolver, "QR Code", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(Intent.createChooser(intent, "Compartilhar QR Code").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

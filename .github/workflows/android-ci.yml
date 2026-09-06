@@ -45,7 +45,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run verification
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :benchmark:assemble
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :benchmark:assemble
 
       - name: Upload reports
         if: always()

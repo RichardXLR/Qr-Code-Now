@@ -27,7 +27,8 @@ data class ScannerUiState(
     val selected: QrContent? = null,
     val origin: ScanOrigin = ScanOrigin.CAMERA,
     val error: String? = null,
-    val analysisPaused: Boolean = false
+    val analysisPaused: Boolean = false,
+    val processingImage: Boolean = false
 )
 
 @HiltViewModel
@@ -44,20 +45,30 @@ class ScannerViewModel @Inject constructor(
     val feedback = _feedback.asSharedFlow()
     private var lastFingerprint: ByteArray? = null
     private var lastDetectedAt = 0L
+    @Volatile private var cameraActive = true
+    @Volatile private var cameraEpoch = 0L
+    private var galleryRequest = 0L
+    private var cameraFailures = 0
+
+    fun setCameraActive(active: Boolean) {
+        cameraActive = active
+        cameraEpoch++
+    }
 
     fun onDetected(values: List<String>, origin: ScanOrigin) {
+        if (origin == ScanOrigin.CAMERA && (!cameraActive || _uiState.value.analysisPaused)) return
         val meaningfulValues = values.asSequence()
             .map(String::trim)
             .filter { value -> value.any { it.isMeaningfulQrCharacter() } }
             .distinct()
             .toList()
         if (meaningfulValues.isEmpty()) {
-            if (origin == ScanOrigin.GALLERY) _uiState.value = _uiState.value.copy(error = "Nenhum QR Code foi encontrado nessa imagem.")
+            if (origin == ScanOrigin.GALLERY) _uiState.value = ScannerUiState(error = "Nenhum QR Code legível foi encontrado. Use a imagem original, com o código inteiro e sua margem visível.", analysisPaused = true)
             return
         }
         val parsed = meaningfulValues.map(parser::parse).filter { it.raw.isNotBlank() }.distinctBy { it.raw }
         if (parsed.isEmpty()) return
-        val now = System.currentTimeMillis()
+        val now = System.nanoTime() / 1_000_000L
         val fingerprint = MessageDigest.getInstance("SHA-256")
             .digest(parsed.map { it.raw }.sorted().joinToString("\u0000").toByteArray())
         if (origin == ScanOrigin.CAMERA && lastFingerprint?.contentEquals(fingerprint) == true && now - lastDetectedAt < DUPLICATE_WINDOW_MS) return
@@ -74,33 +85,57 @@ class ScannerViewModel @Inject constructor(
         save(content, _uiState.value.origin)
     }
 
-    fun dismissResult() { _uiState.value = ScannerUiState() }
+    fun dismissResult() { cameraEpoch++; _uiState.value = ScannerUiState() }
     fun showError(message: String) { _uiState.value = _uiState.value.copy(error = message) }
-    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
+    fun clearError() { galleryRequest++; cameraFailures = 0; cameraEpoch++; _uiState.value = ScannerUiState() }
 
     fun analyze(imageProxy: ImageProxy) {
-        if (_uiState.value.analysisPaused) {
+        if (!cameraActive || _uiState.value.analysisPaused) {
             imageProxy.close()
             return
         }
+        val epoch = cameraEpoch
         scannerEngine.analyze(
             imageProxy,
-            onResult = { onDetected(it, ScanOrigin.CAMERA) },
-            onError = { showError("Não foi possível analisar a imagem da câmera.") }
+            onResult = {
+                if (epoch == cameraEpoch && cameraActive) {
+                    cameraFailures = 0
+                    onDetected(it, ScanOrigin.CAMERA)
+                }
+            },
+            onError = {
+                if (epoch == cameraEpoch && cameraActive && !_uiState.value.analysisPaused && ++cameraFailures >= 3) {
+                    _uiState.value = ScannerUiState(error = "A câmera não conseguiu processar as imagens. Toque em OK para tentar novamente ou use Imagem.", analysisPaused = true)
+                }
+            }
         )
     }
 
     fun scanImage(context: Context, uri: Uri) {
+        cameraEpoch++
+        val request = ++galleryRequest
+        _uiState.value = ScannerUiState(analysisPaused = true, processingImage = true)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(20_000)
+            if (request == galleryRequest && _uiState.value.processingImage) {
+                galleryRequest++
+                _uiState.value = ScannerUiState(error = "A leitura demorou demais. Tente novamente com a imagem original ou outro recorte.", analysisPaused = true)
+            }
+        }
         scannerEngine.scanImage(
             context,
             uri,
-            onResult = { onDetected(it, ScanOrigin.GALLERY) },
-            onError = { showError("Não foi possível abrir ou processar essa imagem.") }
+            onResult = { if (request == galleryRequest) onDetected(it, ScanOrigin.GALLERY) },
+            onError = { if (request == galleryRequest) _uiState.value = ScannerUiState(error = "Não foi possível abrir ou processar essa imagem.", analysisPaused = true) }
         )
     }
 
     private fun save(content: QrContent, origin: ScanOrigin) {
-        viewModelScope.launch { historyRepository.add(content, origin) }
+        viewModelScope.launch {
+            try { historyRepository.add(content, origin) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { /* The readable result remains usable if storage is unavailable. */ }
+        }
     }
 
     private fun Char.isMeaningfulQrCharacter(): Boolean =

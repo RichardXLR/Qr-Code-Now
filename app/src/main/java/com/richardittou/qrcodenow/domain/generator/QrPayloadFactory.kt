@@ -16,7 +16,7 @@ data class GeneratorInput(
 object QrPayloadFactory {
     fun build(input: GeneratorInput): String? {
         val primary = input.primary.trim()
-        if (primary.isBlank()) return null
+        if (primary.none { it.isMeaningfulQrCharacter() }) return null
         return when (input.type) {
             QrType.TEXT, QrType.CUSTOM -> primary
             QrType.PIX -> primary.takeIf { it.startsWith("000201") && it.contains("BR.GOV.BCB.PIX", true) }
@@ -88,6 +88,8 @@ object QrPayloadFactory {
 
     private val EMAIL = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
     private fun isEmail(value: String) = EMAIL.matches(value)
+    private fun Char.isMeaningfulQrCharacter(): Boolean =
+        !isWhitespace() && !isISOControl() && Character.getType(this) != Character.FORMAT.toInt()
     private val EVENT_DATE = Regex("^\\d{8}(T\\d{6}Z?)?$")
     private val WIFI_SECURITY = setOf("WPA", "WPA2", "WPA3", "WEP", "NOPASS")
 }

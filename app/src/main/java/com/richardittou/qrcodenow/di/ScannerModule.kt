@@ -1,8 +1,10 @@
 package com.richardittou.qrcodenow.di
 
 import com.richardittou.qrcodenow.data.scanner.MlKitQrScannerEngine
+import com.richardittou.qrcodenow.data.scanner.MlKitQrBitmapValidator
 import com.richardittou.qrcodenow.domain.action.AndroidExternalActionLauncher
 import com.richardittou.qrcodenow.domain.action.ExternalActionLauncher
+import com.richardittou.qrcodenow.domain.generator.QrBitmapValidator
 import com.richardittou.qrcodenow.domain.scanner.QrScannerEngine
 import dagger.Binds
 import dagger.Module
@@ -14,6 +16,7 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class ScannerBindingsModule {
     @Binds abstract fun bindScanner(impl: MlKitQrScannerEngine): QrScannerEngine
+    @Binds abstract fun bindQrBitmapValidator(impl: MlKitQrBitmapValidator): QrBitmapValidator
 }
 
 @Module

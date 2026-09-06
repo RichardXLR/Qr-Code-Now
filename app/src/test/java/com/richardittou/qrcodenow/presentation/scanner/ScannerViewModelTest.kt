@@ -63,6 +63,33 @@ class ScannerViewModelTest {
 
         assertThat(history.addCalls).isEqualTo(1)
     }
+
+    @Test fun inactiveScannerAndPausedResultIgnoreNewCameraDetections() = runTest(dispatcher) {
+        val history = RecordingHistoryRepository()
+        val viewModel = ScannerViewModel(RecordingParser(), history, FakeSettingsRepository(), FakeScannerEngine())
+        viewModel.setCameraActive(false)
+        viewModel.onDetected(listOf("fora da tela"), ScanOrigin.CAMERA)
+        assertThat(viewModel.uiState.value.selected).isNull()
+        viewModel.setCameraActive(true)
+        viewModel.onDetected(listOf("primeiro"), ScanOrigin.CAMERA)
+        viewModel.onDetected(listOf("segundo frame atrasado"), ScanOrigin.CAMERA)
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.selected?.raw).isEqualTo("primeiro")
+        assertThat(history.addCalls).isEqualTo(1)
+    }
+
+    @Test fun noQrGalleryResultCanBeDismissedAndReadAgain() = runTest(dispatcher) {
+        val viewModel = ScannerViewModel(RecordingParser(), RecordingHistoryRepository(), FakeSettingsRepository(), FakeScannerEngine())
+        viewModel.onDetected(emptyList(), ScanOrigin.GALLERY)
+        assertThat(viewModel.uiState.value.error).isNotNull()
+        viewModel.clearError()
+        assertThat(viewModel.uiState.value.analysisPaused).isFalse()
+        viewModel.onDetected(listOf("imagem válida"), ScanOrigin.GALLERY)
+        assertThat(viewModel.uiState.value.selected?.raw).isEqualTo("imagem válida")
+        viewModel.dismissResult()
+        viewModel.onDetected(listOf("imagem válida"), ScanOrigin.GALLERY)
+        assertThat(viewModel.uiState.value.selected?.raw).isEqualTo("imagem válida")
+    }
 }
 
 private class RecordingParser : QrContentParser {

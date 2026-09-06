@@ -1,6 +1,7 @@
 package com.richardittou.qrcodenow.presentation.generator
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
@@ -44,17 +46,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.richardittou.qrcodenow.data.media.QrImageStore
@@ -69,6 +79,19 @@ fun GeneratorScreen(viewModel: GeneratorViewModel = hiltViewModel()) {
     var typeMenu by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var enlarged by remember { mutableStateOf(false) }
+
+    if (enlarged && state.bitmap != null) {
+        Dialog(onDismissRequest = { enlarged = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Column(Modifier.fillMaxWidth().background(Color.White).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(requireNotNull(state.bitmap).asImageBitmap(), "QR Code ampliado",
+                    modifier = Modifier.widthIn(max = 700.dp).fillMaxWidth().aspectRatio(1f), filterQuality = FilterQuality.None)
+                TextButton(onClick = { enlarged = false }) { Text("Fechar") }
+            }
+        }
+    }
 
     LaunchedEffect(message) {
         message?.let {
@@ -125,23 +148,51 @@ fun GeneratorScreen(viewModel: GeneratorViewModel = hiltViewModel()) {
                             Image(
                                 bitmap.asImageBitmap(),
                                 "QR Code gerado",
-                                modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp).aspectRatio(1f)
+                                modifier = Modifier
+                                    .widthIn(max = 360.dp)
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .background(Color.White)
+                                    .padding(8.dp),
+                                filterQuality = FilterQuality.None
                             )
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = { enlarged = true }) { Text("Ampliar QR Code") }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.size(6.dp))
+                                Text("QR Code validado")
+                            }
                             Spacer(Modifier.height(12.dp))
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = {
-                                    imageStore.save(context, bitmap).onSuccess { message = "Imagem salva em Pictures/QR Code Now" }
-                                        .onFailure { message = "Não foi possível salvar a imagem." }
-                                }, modifier = Modifier.fillMaxWidth()) {
+                                    saving = true
+                                    scope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) { imageStore.save(context, bitmap) }
+                                                .onSuccess { message = "Imagem salva em Pictures/QR Code Now" }
+                                                .onFailure { message = "Não foi possível salvar a imagem." }
+                                        } finally { saving = false }
+                                    }
+                                }, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Outlined.Save, null)
                                     Spacer(Modifier.size(8.dp))
                                     Text("Salvar imagem")
                                 }
                                 FilledTonalButton(onClick = {
-                                    imageStore.save(context, bitmap).onSuccess { uri ->
-                                        imageStore.share(context, uri).onFailure { message = "Não foi possível compartilhar." }
-                                    }.onFailure { message = "Não foi possível preparar a imagem." }
-                                }, modifier = Modifier.fillMaxWidth()) {
+                                    saving = true
+                                    scope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) { imageStore.save(context, bitmap) }.onSuccess { uri ->
+                                                imageStore.share(context, uri).onFailure { message = "Não foi possível compartilhar." }
+                                            }.onFailure { message = "Não foi possível preparar a imagem." }
+                                        } finally { saving = false }
+                                    }
+                                }, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Outlined.Share, null)
                                     Spacer(Modifier.size(8.dp))
                                     Text("Compartilhar")

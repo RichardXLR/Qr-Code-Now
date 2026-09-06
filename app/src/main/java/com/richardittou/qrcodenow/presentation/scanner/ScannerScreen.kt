@@ -9,6 +9,8 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.view.MotionEvent
+import android.util.Size as AndroidSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +18,9 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.RepeatMode
@@ -52,6 +57,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +94,8 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.richardittou.qrcodenow.domain.action.AndroidExternalActionLauncher
 import com.richardittou.qrcodenow.domain.model.QrContent
 import com.richardittou.qrcodenow.ui.theme.BrandRed
@@ -116,6 +124,20 @@ fun ScannerScreen(
     }
     val haptics = LocalHapticFeedback.current
     val currentSettings by rememberUpdatedState(appSettings)
+    val screenLifecycle = LocalLifecycleOwner.current
+    DisposableEffect(screenLifecycle) {
+        fun refresh() {
+            cameraGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            viewModel.setCameraActive(screenLifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        }
+        val observer = LifecycleEventObserver { _, _ -> refresh() }
+        screenLifecycle.lifecycle.addObserver(observer)
+        refresh()
+        onDispose {
+            screenLifecycle.lifecycle.removeObserver(observer)
+            viewModel.setCameraActive(false)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.feedback.collect {
@@ -170,6 +192,14 @@ fun ScannerScreen(
         }
     }
 
+    if (state.processingImage) {
+        AlertDialog(
+            onDismissRequest = viewModel::clearError,
+            title = { Text("Lendo imagem") },
+            text = { CircularProgressIndicator() },
+            confirmButton = { TextButton(onClick = viewModel::clearError) { Text("Cancelar") } }
+        )
+    }
     if (state.results.size > 1 && state.selected == null) {
         AlertDialog(
             onDismissRequest = viewModel::dismissResult,
@@ -212,7 +242,6 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember { Executors.newSingleThreadExecutor() }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val currentPaused by rememberUpdatedState(paused)
     val currentAnalyze by rememberUpdatedState(analyze)
@@ -220,23 +249,63 @@ private fun CameraPreview(
     val currentOnCameraReady by rememberUpdatedState(onCameraReady)
 
     DisposableEffect(lifecycleOwner) {
+        val executor = Executors.newSingleThreadExecutor()
+        var disposed = false
+        var ownedPreview: Preview? = null
+        var ownedAnalysis: ImageAnalysis? = null
         val providerFuture = ProcessCameraProvider.getInstance(context)
         val listener = Runnable {
+            if (disposed) return@Runnable
             runCatching {
                 val provider = providerFuture.get()
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setResolutionStrategy(
+                                ResolutionStrategy(
+                                    AndroidSize(1280, 960),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                                )
+                            )
+                            .build()
+                    )
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also { it.setAnalyzer(executor) { image -> if (currentPaused) image.close() else currentAnalyze(image) } }
-                provider.unbindAll()
-                currentOnCameraReady(provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis))
+                ownedPreview = preview
+                ownedAnalysis = analysis
+                val camera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                currentOnCameraReady(camera)
+                fun focus(x: Float, y: Float) {
+                    if (!disposed && previewView.width > 0 && previewView.height > 0) {
+                        runCatching {
+                            val point = previewView.meteringPointFactory.createPoint(x, y)
+                            val action = FocusMeteringAction.Builder(point)
+                                .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS).build()
+                            camera.cameraControl.startFocusAndMetering(action)
+                        }
+                    }
+                }
+                previewView.post { focus(previewView.width / 2f, previewView.height / 2f) }
+                previewView.setOnTouchListener { view, event ->
+                    if (event.action == MotionEvent.ACTION_UP) {
+                        view.performClick()
+                        focus(event.x, event.y)
+                    }
+                    true
+                }
             }.onFailure(currentOnError)
         }
         providerFuture.addListener(listener, ContextCompat.getMainExecutor(context))
         onDispose {
+            disposed = true
+            previewView.setOnTouchListener(null)
+            ownedAnalysis?.clearAnalyzer()
             currentOnCameraReady(null)
-            if (providerFuture.isDone) runCatching { providerFuture.get().unbindAll() }
+            if (providerFuture.isDone) runCatching {
+                providerFuture.get().unbind(*listOfNotNull(ownedPreview, ownedAnalysis).toTypedArray())
+            }
             executor.shutdown()
         }
     }

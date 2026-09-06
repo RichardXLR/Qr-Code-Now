@@ -34,7 +34,8 @@ O QR Code Now processa câmera, imagens, histórico e códigos inteiramente no a
 - Leitura pela câmera ou pelo Photo Picker, com seleção quando uma imagem contém vários códigos.
 - Bloqueio de leituras vazias e repetidas, além de análise local de URLs suspeitas.
 - Geração de texto, URL, Wi-Fi, telefone, SMS, e-mail, localização, contato, evento, PIX e conteúdo personalizado.
-- Validação automática de leitura antes de salvar um QR Code gerado.
+- Validação automática com ZXing e ML Kit antes de exibir um QR Code gerado, inclusive em versão reduzida.
+- Segunda tentativa offline de leitura, foco por toque e ampliação do QR gerado.
 - Histórico local pesquisável, filtros, ordenação, favoritos, seleção múltipla e exclusão com opção de desfazer.
 - Temas claro, escuro e automático, com layouts adaptáveis para celulares e telas maiores.
 - Ações externas seguras: links, mapas, discador, SMS, e-mail e conexão Wi-Fi sempre passam pela confirmação apropriada do Android.
@@ -42,6 +43,8 @@ O QR Code Now processa câmera, imagens, histórico e códigos inteiramente no a
 ## Tipos reconhecidos
 
 URL, texto, telefone, SMS, e-mail, Wi-Fi, localização, vCard/contato, evento, PIX/EMV, links de aplicativos e conteúdos desconhecidos.
+
+Para ler um código salvo no mesmo aparelho, use **Scanner → Imagem** e selecione o PNG original. Para fotografar outro visor, mantenha o código inteiro e sua margem visíveis; toque na câmera para ajustar o foco. Códigos cortados, muito pequenos, desfocados ou danificados podem não ser recuperáveis. A detecção do código não garante a validade de um pagamento ou dos dados que ele contém.
 
 ## Arquitetura
 

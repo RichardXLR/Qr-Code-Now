@@ -32,4 +32,8 @@ class QrPayloadFactoryTest {
         assertThat(QrPayloadFactory.build(GeneratorInput(QrType.EVENT, "Evento", "20261340"))).isNull()
         assertThat(QrPayloadFactory.build(GeneratorInput(QrType.WIFI, "Rede", "curta", "WPA2"))).isNull()
     }
+
+    @Test fun `rejects content made only of invisible characters`() {
+        assertThat(QrPayloadFactory.build(GeneratorInput(QrType.CUSTOM, "\u200B\u200D"))).isNull()
+    }
 }

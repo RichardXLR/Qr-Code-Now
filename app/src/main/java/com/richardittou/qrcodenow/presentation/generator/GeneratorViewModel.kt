@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.richardittou.qrcodenow.domain.generator.GeneratorInput
 import com.richardittou.qrcodenow.domain.generator.QrEncoder
+import com.richardittou.qrcodenow.domain.generator.QrBitmapValidator
+import com.richardittou.qrcodenow.domain.generator.QrEncodingException
 import com.richardittou.qrcodenow.domain.generator.QrPayloadFactory
 import com.richardittou.qrcodenow.domain.model.QrContent
 import com.richardittou.qrcodenow.domain.model.QrType
@@ -36,13 +38,16 @@ data class GeneratorUiState(
 @HiltViewModel
 class GeneratorViewModel @Inject constructor(
     private val encoder: QrEncoder,
+    private val bitmapValidator: QrBitmapValidator,
     private val parser: QrContentParser,
     private val historyRepository: HistoryRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GeneratorUiState())
     val uiState = _uiState.asStateFlow()
+    private var generationVersion = 0L
 
     fun setType(type: QrType) {
+        generationVersion++
         _uiState.value = GeneratorUiState(type = type, tertiary = if (type == QrType.WIFI) "WPA2" else "")
     }
     fun setPrimary(value: String) { _uiState.value = _uiState.value.invalidated(primary = value.take(16_384)) }
@@ -52,6 +57,8 @@ class GeneratorViewModel @Inject constructor(
 
     fun generate() {
         val state = _uiState.value
+        if (state.generating) return
+        val version = ++generationVersion
         val payload = QrPayloadFactory.build(GeneratorInput(state.type, state.primary, state.secondary, state.tertiary, state.extra))
         if (payload == null) {
             _uiState.value = state.copy(error = "Confira os campos e os formatos informados.")
@@ -61,18 +68,30 @@ class GeneratorViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 val bitmap = withContext(Dispatchers.Default) { encoder.encode(payload) }
-                if (!_uiState.value.matchesInput(state)) return@launch
+                if (!kotlinx.coroutines.withTimeout(15_000) { bitmapValidator.isReadable(bitmap, payload) }) {
+                    bitmap.recycle()
+                    throw QrEncodingException(
+                        "O conteúdo ficou denso demais para uma leitura confiável. Reduza-o e gere novamente."
+                    )
+                }
+                if (generationVersion != version || !_uiState.value.matchesInput(state)) {
+                    bitmap.recycle()
+                    return@launch
+                }
                 val id = historyRepository.add(parser.parse(payload), ScanOrigin.GENERATED)
                 bitmap to id
             }
                 .onSuccess { (bitmap, id) ->
-                    if (_uiState.value.matchesInput(state)) {
+                    if (generationVersion == version && _uiState.value.matchesInput(state)) {
                         _uiState.value = _uiState.value.copy(payload = payload, bitmap = bitmap, historyId = id, generating = false)
                     }
                 }
-                .onFailure {
-                    if (_uiState.value.matchesInput(state)) {
-                        _uiState.value = _uiState.value.copy(error = "Não foi possível gerar o QR Code.", generating = false)
+                .onFailure { error ->
+                    if (error is kotlinx.coroutines.CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) throw error
+                    if (generationVersion == version && _uiState.value.matchesInput(state)) {
+                        val message = (error as? QrEncodingException)?.message
+                            ?: "Não foi possível gerar e validar o QR Code."
+                        _uiState.value = _uiState.value.copy(error = message, generating = false)
                     }
                 }
         }
@@ -105,7 +124,9 @@ class GeneratorViewModel @Inject constructor(
         secondary: String = this.secondary,
         tertiary: String = this.tertiary,
         extra: String = this.extra
-    ) = copy(
+    ): GeneratorUiState {
+        generationVersion++
+        return copy(
         primary = primary,
         secondary = secondary,
         tertiary = tertiary,
@@ -117,6 +138,7 @@ class GeneratorViewModel @Inject constructor(
         error = null,
         generating = false
     )
+    }
 
     private fun GeneratorUiState.matchesInput(other: GeneratorUiState): Boolean =
         type == other.type && primary == other.primary && secondary == other.secondary &&
